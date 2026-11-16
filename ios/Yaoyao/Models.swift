@@ -73,3 +73,11 @@ func shortDateText(_ date: Date) -> String {
     f.dateFormat = "M月d日 HH:mm"
     return f.string(from: date)
 }
+
+/// 只要时分，比如 "14:07"
+func hourMinute(_ date: Date) -> String {
+    let f = DateFormatter()
+    f.locale = Locale(identifier: "zh_CN")
+    f.dateFormat = "HH:mm"
+    return f.string(from: date)
+}
