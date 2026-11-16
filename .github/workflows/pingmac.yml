@@ -1,0 +1,11 @@
+name: pingmac
+on: {workflow_dispatch: {}}
+jobs:
+  probe:
+    strategy:
+      matrix:
+        os: [macos-latest, macos-15, macos-14, macos-13]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - run: echo "ok on ${{ matrix.os }}"; sw_vers; xcodebuild -version || true
