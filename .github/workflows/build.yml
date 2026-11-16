@@ -1,0 +1,46 @@
+name: build-ipa
+
+# 手动触发：Actions 页面点 Run workflow
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 选择 Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer || true
+          xcodebuild -version
+
+      - name: 编译
+        run: |
+          cd ios
+          xcodebuild \
+            -project Yaoyao.xcodeproj \
+            -target Yaoyao \
+            -configuration Release \
+            -sdk iphoneos \
+            -arch arm64 \
+            CONFIGURATION_BUILD_DIR="$PWD/build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: 打包成 ipa
+        run: |
+          cd ios
+          mkdir -p Payload
+          cp -R build/Yaoyao.app Payload/
+          zip -qry Yaoyao.ipa Payload
+          ls -lh Yaoyao.ipa
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" Payload/Yaoyao.app/Info.plist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: yaoyao-ipa
+          path: ios/Yaoyao.ipa
+          if-no-files-found: error
