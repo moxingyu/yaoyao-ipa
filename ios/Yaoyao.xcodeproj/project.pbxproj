@@ -11,6 +11,9 @@
 		AA0000000000000000000015 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000011 /* Models.swift */; };
 		AA0000000000000000000016 /* Store.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000012 /* Store.swift */; };
 		AA0000000000000000000017 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000013 /* ContentView.swift */; };
+		AA000000000000000000001C /* AlarmEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000018 /* AlarmEngine.swift */; };
+		AA000000000000000000001D /* silence.wav in Resources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000019 /* silence.wav */; };
+		AA000000000000000000001E /* alarm.m4a in Resources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000001A /* alarm.m4a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -19,6 +22,10 @@
 		AA0000000000000000000011 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		AA0000000000000000000012 /* Store.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Store.swift; sourceTree = "<group>"; };
 		AA0000000000000000000013 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		AA0000000000000000000018 /* AlarmEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmEngine.swift; sourceTree = "<group>"; };
+		AA0000000000000000000019 /* silence.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = silence.wav; sourceTree = "<group>"; };
+		AA000000000000000000001A /* alarm.m4a */ = {isa = PBXFileReference; lastKnownFileType = file; path = alarm.m4a; sourceTree = "<group>"; };
+		AA000000000000000000001B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,9 +61,21 @@
 				AA0000000000000000000010 /* YaoyaoApp.swift */,
 				AA0000000000000000000011 /* Models.swift */,
 				AA0000000000000000000012 /* Store.swift */,
+				AA0000000000000000000018 /* AlarmEngine.swift */,
 				AA0000000000000000000013 /* ContentView.swift */,
+				AA000000000000000000001F /* Resources */,
+				AA000000000000000000001B /* Info.plist */,
 			);
 			path = Yaoyao;
+			sourceTree = "<group>";
+		};
+		AA000000000000000000001F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				AA0000000000000000000019 /* silence.wav */,
+				AA000000000000000000001A /* alarm.m4a */,
+			);
+			path = Resources;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -117,6 +136,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AA000000000000000000001D /* silence.wav in Resources */,
+				AA000000000000000000001E /* alarm.m4a in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -131,6 +152,7 @@
 				AA0000000000000000000015 /* Models.swift in Sources */,
 				AA0000000000000000000016 /* Store.swift in Sources */,
 				AA0000000000000000000017 /* ContentView.swift in Sources */,
+				AA000000000000000000001C /* AlarmEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -204,21 +226,16 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "熬药记录";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Yaoyao/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mac.yaoyao;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -234,21 +251,16 @@
 				CODE_SIGNING_REQUIRED = NO;
 				CODE_SIGN_IDENTITY = "";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "熬药记录";
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
-				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
-				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Yaoyao/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mac.yaoyao;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
