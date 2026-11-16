@@ -4,9 +4,14 @@ import UserNotifications
 
 struct ContentView: View {
     @EnvironmentObject var store: Store
+    @StateObject private var alarm = AlarmEngine.shared
+
     @State private var showAdd = false
     @State private var showSettings = false
+    @State private var showClearLogs = false
     @State private var brewTarget: Prescription?
+    @State private var renaming: Prescription?
+    @State private var renameText = ""
 
     var body: some View {
         NavigationStack {
@@ -15,7 +20,7 @@ struct ContentView: View {
                     if !store.activeTimers.isEmpty {
                         sectionTitle("正在熬")
                         ForEach(store.activeTimers) { t in
-                            timerRow(t)
+                            timerCard(t)
                         }
                     }
 
@@ -35,28 +40,7 @@ struct ContentView: View {
                         }
                     }
 
-                    if !store.logs.isEmpty {
-                        sectionTitle("最近记录")
-                        VStack(spacing: 0) {
-                            ForEach(Array(store.logs.prefix(8))) { log in
-                                HStack(alignment: .top, spacing: 10) {
-                                    Text(shortDateText(log.date))
-                                        .font(.caption.monospacedDigit())
-                                        .foregroundStyle(.secondary)
-                                        .frame(width: 84, alignment: .leading)
-                                    Text(log.text).font(.subheadline)
-                                    Spacer(minLength: 0)
-                                }
-                                .padding(.vertical, 8)
-                                if log.id != store.logs.prefix(8).last?.id {
-                                    Divider()
-                                }
-                            }
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 4)
-                        .background(cardBackground)
-                    }
+                    logsSection
                 }
                 .padding(14)
                 .padding(.bottom, 30)
@@ -65,27 +49,49 @@ struct ContentView: View {
             .navigationTitle("熬药记录")
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { showSettings = true } label: {
-                        Image(systemName: "gearshape")
-                    }
+                    Button { showSettings = true } label: { Image(systemName: "gearshape") }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showAdd = true } label: {
-                        Image(systemName: "plus.circle.fill")
-                    }
+                    Button { showAdd = true } label: { Image(systemName: "plus.circle.fill") }
                 }
             }
             .sheet(isPresented: $showAdd) { AddPrescriptionSheet() }
             .sheet(isPresented: $showSettings) { SettingsSheet() }
             .sheet(item: $brewTarget) { p in StartBrewSheet(prescription: p) }
         }
-        .overlay(alignment: .top) { toastView }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+        .overlay(alignment: .top) {
+            VStack(spacing: 8) {
+                ringingBar
+                toastView
+            }
+        }
+        .alert("重命名这副药", isPresented: renameBinding) {
+            TextField("药名", text: $renameText)
+            Button("取消", role: .cancel) { renaming = nil }
+            Button("保存") {
+                if let p = renaming { store.rename(p, to: renameText) }
+                renaming = nil
+            }
+        }
+        .alert("清空全部流水账？", isPresented: $showClearLogs) {
+            Button("取消", role: .cancel) {}
+            Button("清空", role: .destructive) { store.clearLogs() }
+        } message: {
+            Text("只清记录，药和次数不受影响。")
+        }
+        .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
             store.tick()
         }
     }
 
-    // MARK: - 小组件
+    private var renameBinding: Binding<Bool> {
+        Binding(
+            get: { renaming != nil },
+            set: { if !$0 { renaming = nil } }
+        )
+    }
+
+    // MARK: - 通用小组件
 
     private var cardBackground: some View {
         RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -101,24 +107,54 @@ struct ContentView: View {
         .padding(.top, 4)
     }
 
-    private var toastView: some View {
-        Group {
-            if let b = store.banner {
-                Text(b)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 11)
-                    .background(Capsule().fill(Color.accentColor))
-                    .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
-                    .padding(.top, 6)
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                            withAnimation(.easeOut(duration: 0.25)) { store.banner = nil }
-                        }
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
+    @ViewBuilder
+    private var ringingBar: some View {
+        if alarm.ringing {
+            HStack(spacing: 10) {
+                Image(systemName: "alarm.fill")
+                    .font(.title3)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("闹铃正在响").font(.subheadline.weight(.bold))
+                    Text(alarm.ringingTitles.joined(separator: " · "))
+                        .font(.caption).opacity(0.9).lineLimit(1)
+                }
+                Spacer()
+                Button {
+                    alarm.stopAlarm()
+                } label: {
+                    Text("停止")
+                        .font(.subheadline.weight(.bold))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(Color.white.opacity(0.28)))
+                }
+                .buttonStyle(.plain)
             }
+            .foregroundStyle(.white)
+            .padding(13)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Color.red))
+            .padding(.horizontal, 14)
+            .transition(.move(edge: .top).combined(with: .opacity))
+        }
+    }
+
+    @ViewBuilder
+    private var toastView: some View {
+        if let b = store.banner {
+            Text(b)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(Capsule().fill(Color.accentColor))
+                .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
+                .padding(.horizontal, 14)
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation(.easeOut(duration: 0.25)) { store.banner = nil }
+                    }
+                }
+                .transition(.move(edge: .top).combined(with: .opacity))
         }
     }
 
@@ -140,59 +176,106 @@ struct ContentView: View {
 
     // MARK: - 倒计时卡片
 
-    private func timerRow(_ t: BrewTimer) -> some View {
+    private func timerCard(_ t: BrewTimer) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(t.label).font(.headline).lineLimit(1)
-                Spacer()
-                Text(t.done ? "时间到" : clockText(t.secondsLeft))
-                    .font(.system(.title2, design: .rounded))
-                    .monospacedDigit()
-                    .fontWeight(.bold)
-                    .foregroundStyle(t.done ? Color.orange : Color.primary)
-            }
+            HStack(spacing: 14) {
+                ringView(t)
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(t.label).font(.headline).lineLimit(1)
+                    Text(t.done ? "时间到，去关火" : "预计 \(hourMinute(t.end)) 完成")
+                        .font(.caption)
+                        .foregroundStyle(t.done ? Color.orange : Color.secondary)
 
-            ProgressView(value: t.progress)
-                .tint(t.done ? Color.orange : Color.accentColor)
+                    HStack(spacing: 8) {
+                        Button {
+                            withAnimation { store.confirmBrew(t) }
+                        } label: {
+                            Text("熬好了")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
 
-            if t.done {
-                HStack(spacing: 10) {
-                    Button {
-                        withAnimation { store.confirmBrew(t) }
-                    } label: {
-                        Text("熬好了").frame(maxWidth: .infinity)
+                        Button {
+                            withAnimation { store.cancelTimer(t) }
+                        } label: {
+                            Text("不算这次")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.borderedProminent)
-
-                    Button {
-                        withAnimation { store.cancelTimer(t) }
-                    } label: {
-                        Text("不算这次").frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
+                    .padding(.top, 1)
                 }
-                .font(.subheadline.weight(.semibold))
-            } else {
-                Text("到点会响铃 + 振动，回来点「熬好了」记一次")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(16)
         .background(cardBackground)
     }
 
+    private func ringView(_ t: BrewTimer) -> some View {
+        TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            let left = t.secondsLeft
+            let progress = t.progress
+            ZStack {
+                Circle()
+                    .stroke(Color(uiColor: .systemFill), lineWidth: 7)
+                Circle()
+                    .trim(from: 0, to: min(1, max(0.002, progress)))
+                    .stroke(
+                        t.done ? AnyShapeStyle(Color.orange) : AnyShapeStyle(Color.accentColor),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                    )
+                    .rotationEffect(.degrees(-90))
+                    .animation(.linear(duration: 0.25), value: progress)
+                VStack(spacing: 0) {
+                    Text(clockText(left))
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                    Text(t.done ? "到点" : "剩余")
+                        .font(.system(size: 9))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(width: 86, height: 86)
+        }
+    }
+
     // MARK: - 处方卡片
 
     private func prescriptionCard(_ p: Prescription) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(p.name).font(.title3.weight(.semibold)).lineLimit(1)
                 Spacer()
                 Text(p.isBrewedOut ? "已熬完" : "第 \(p.nextBrewIndex) / \(p.totalBrews) 次")
                     .font(.subheadline)
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                Menu {
+                    Button {
+                        renameText = p.name
+                        renaming = p
+                    } label: {
+                        Label("重命名", systemImage: "pencil")
+                    }
+                    Button {
+                        store.undoDrink(p)
+                    } label: {
+                        Label("撤销一次喝药", systemImage: "arrow.uturn.backward")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        withAnimation { store.delete(p) }
+                    } label: {
+                        Label("删除这副药", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 2)
+                }
             }
 
             HStack(spacing: 7) {
@@ -233,18 +316,6 @@ struct ContentView: View {
         }
         .padding(16)
         .background(cardBackground)
-        .contextMenu {
-            Button {
-                store.undoDrink(p)
-            } label: {
-                Label("撤销上一次「喝一碗」", systemImage: "arrow.uturn.backward")
-            }
-            Button(role: .destructive) {
-                store.delete(p)
-            } label: {
-                Label("删除这副药", systemImage: "trash")
-            }
-        }
     }
 
     private func dotColor(index: Int, p: Prescription) -> Color {
@@ -260,8 +331,7 @@ struct ContentView: View {
             .padding(.horizontal, 9)
             .padding(.vertical, 5)
             .background(
-                Capsule()
-                    .fill(active ? Color.accentColor.opacity(0.12) : Color(uiColor: .systemFill))
+                Capsule().fill(active ? Color.accentColor.opacity(0.12) : Color(uiColor: .systemFill))
             )
             .foregroundStyle(active ? Color.accentColor : Color.secondary)
     }
@@ -275,7 +345,7 @@ struct ContentView: View {
             }
             Spacer()
             Button(role: .destructive) {
-                store.delete(p)
+                withAnimation { store.delete(p) }
             } label: {
                 Image(systemName: "trash")
             }
@@ -283,6 +353,50 @@ struct ContentView: View {
         }
         .padding(14)
         .background(cardBackground)
+    }
+
+    // MARK: - 流水账
+
+    @ViewBuilder
+    private var logsSection: some View {
+        if !store.logs.isEmpty {
+            HStack {
+                Text("最近记录").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                Spacer()
+                Button("清空") { showClearLogs = true }
+                    .font(.footnote)
+            }
+            .padding(.horizontal, 2)
+            .padding(.top, 4)
+
+            VStack(spacing: 0) {
+                ForEach(Array(store.logs.prefix(10))) { log in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(shortDateText(log.date))
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 82, alignment: .leading)
+                        Text(log.text).font(.subheadline)
+                        Spacer(minLength: 0)
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.vertical, 9)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            withAnimation { store.deleteLog(log) }
+                        } label: {
+                            Label("删除这条记录", systemImage: "trash")
+                        }
+                    }
+                    if log.id != Array(store.logs.prefix(10)).last?.id {
+                        Divider()
+                    }
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 4)
+            .background(cardBackground)
+        }
     }
 }
 
@@ -374,7 +488,7 @@ struct StartBrewSheet: View {
                 } header: {
                     Text("熬「\(prescription.name)」第 \(prescription.nextBrewIndex) 次")
                 } footer: {
-                    Text("开始后会把提醒排进系统，锁屏也会响铃振动。")
+                    Text("开始后即使锁屏、切到别的 App，到点也会像闹钟一样响铃。")
                 }
 
                 Section {
@@ -404,6 +518,7 @@ struct StartBrewSheet: View {
 
 struct SettingsSheet: View {
     @EnvironmentObject var store: Store
+    @StateObject private var alarm = AlarmEngine.shared
     @Environment(\.dismiss) private var dismiss
     @State private var authText = "检查中…"
     @State private var showClear = false
@@ -419,6 +534,25 @@ struct SettingsSheet: View {
                     Text("每天喝药的提醒时间")
                 } footer: {
                     Text("只在还有药没喝完的时候才会提醒。")
+                }
+
+                Section {
+                    Button {
+                        alarm.startAlarm(title: "测试")
+                    } label: {
+                        Label("响铃测试（可以锁屏试）", systemImage: "bell.badge")
+                    }
+                    if alarm.ringing {
+                        Button(role: .destructive) {
+                            alarm.stopAlarm()
+                        } label: {
+                            Label("停止响铃", systemImage: "stop.circle")
+                        }
+                    }
+                } header: {
+                    Text("响铃")
+                } footer: {
+                    Text("测试时会像闹钟一样连续响，锁屏也在响。别在安静场合点。")
                 }
 
                 Section("通知") {
