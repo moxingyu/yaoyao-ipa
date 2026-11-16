@@ -46,11 +46,13 @@ final class Store: ObservableObject {
 
     func bootstrap() {
         requestNotificationPermission()
-        // 上次没确认的倒计时，如果已经到点就先标成完成
         for t in timers where !t.done && Date() >= t.end {
             if let i = timers.firstIndex(where: { $0.id == t.id }) {
                 timers[i].done = true
             }
+        }
+        if timers.contains(where: { !$0.done }) {
+            AlarmEngine.shared.startKeepAlive()
         }
         scheduleDrinkReminders()
     }
@@ -67,6 +69,15 @@ final class Store: ObservableObject {
         prescriptions.append(p)
         addLog("新建：\(p.name)，共 \(p.totalBrews) 次")
         scheduleDrinkReminders()
+    }
+
+    func rename(_ p: Prescription, to newName: String) {
+        guard let i = prescriptions.firstIndex(where: { $0.id == p.id }) else { return }
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let old = prescriptions[i].name
+        prescriptions[i].name = trimmed
+        addLog("改名：\(old) → \(trimmed)")
     }
 
     func drink(_ p: Prescription) {
@@ -95,6 +106,7 @@ final class Store: ObservableObject {
         prescriptions.removeAll { $0.id == p.id }
         timers.removeAll { $0.prescriptionID == p.id }
         addLog("删除：\(p.name)")
+        syncKeepAlive()
     }
 
     // MARK: - 倒计时
@@ -110,41 +122,55 @@ final class Store: ObservableObject {
         )
         timers.append(t)
         scheduleTimerNotification(t)
+        AlarmEngine.shared.startKeepAlive()
         addLog("开火：\(p.name) 第 \(p.nextBrewIndex) 次，\(minutes) 分钟")
     }
 
     func cancelTimer(_ t: BrewTimer) {
         timers.removeAll { $0.id == t.id }
         removeNotification("timer-\(t.id.uuidString)")
+        AlarmEngine.shared.stopAlarm(title: t.label)
         addLog("取消倒计时：\(t.label)")
+        syncKeepAlive()
     }
 
     /// 倒计时结束后用户确认「熬好了」
     func confirmBrew(_ t: BrewTimer) {
         timers.removeAll { $0.id == t.id }
         removeNotification("timer-\(t.id.uuidString)")
+        AlarmEngine.shared.stopAlarm(title: t.label)
         guard let pid = t.prescriptionID,
-              let i = prescriptions.firstIndex(where: { $0.id == pid }) else { return }
+              let i = prescriptions.firstIndex(where: { $0.id == pid }) else {
+            syncKeepAlive()
+            return
+        }
         prescriptions[i].brewed = min(prescriptions[i].totalBrews, prescriptions[i].brewed + 1)
         addLog("\(prescriptions[i].name) 熬好第 \(prescriptions[i].brewed) 次")
         banner = "\(prescriptions[i].name) 第 \(prescriptions[i].brewed) 次记上了"
+        syncKeepAlive()
     }
 
     /// 每秒调用一次：检查有没有到点
     func tick() {
         let now = Date()
-        var fired = false
+        var firedLabels: [String] = []
         for t in timers where !t.done && now >= t.end {
             if let i = timers.firstIndex(where: { $0.id == t.id }) {
                 timers[i].done = true
-                fired = true
+                firedLabels.append(t.label)
             }
         }
-        if fired {
+        if !firedLabels.isEmpty {
             AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-            AudioServicesPlaySystemSound(1005)
-            banner = "熬药时间到，去关火"
+            for label in firedLabels {
+                AlarmEngine.shared.startAlarm(title: label)
+            }
+            banner = firedLabels.count > 1
+                ? "「\(firedLabels.joined(separator: "」「"))」都到点了"
+                : "熬药时间到，去关火"
         }
+        AlarmEngine.shared.refreshIfFinished()
+
         let dayKey = Calendar.current.startOfDay(for: now).description
         if dayKey != lastScheduleDay {
             lastScheduleDay = dayKey
@@ -152,13 +178,27 @@ final class Store: ObservableObject {
         }
     }
 
+    private func syncKeepAlive() {
+        if timers.contains(where: { !$0.done }) {
+            AlarmEngine.shared.startKeepAlive()
+        } else if !AlarmEngine.shared.ringing {
+            AlarmEngine.shared.stopKeepAlive()
+        }
+    }
+
     // MARK: - 通知
+
+    /// 用 25 秒短铃当通知声音：锁屏时能连着响 30 秒，不会只"叮"一声
+    private func alarmSound() -> UNNotificationSound {
+        UNNotificationSound(named: UNNotificationSoundName("alarm.m4a"))
+    }
 
     private func scheduleTimerNotification(_ t: BrewTimer) {
         let content = UNMutableNotificationContent()
         content.title = "熬药时间到"
         content.body = "「\(t.label)」已经 \(t.duration / 60) 分钟，该关火了。"
-        content.sound = .default
+        content.sound = alarmSound()
+        content.interruptionLevel = .timeSensitive
         let interval = max(1, t.end.timeIntervalSinceNow)
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: interval, repeats: false)
         UNUserNotificationCenter.current().add(
@@ -210,11 +250,21 @@ final class Store: ObservableObject {
         if logs.count > 200 { logs = Array(logs.prefix(200)) }
     }
 
+    func deleteLog(_ log: LogEntry) {
+        logs.removeAll { $0.id == log.id }
+    }
+
+    func clearLogs() {
+        logs.removeAll()
+    }
+
     func clearAll() {
         prescriptions = []
         timers = []
         logs = []
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        AlarmEngine.shared.stopAlarm()
+        AlarmEngine.shared.stopKeepAlive()
     }
 
     // MARK: - 存取
